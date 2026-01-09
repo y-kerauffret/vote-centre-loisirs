@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prêt de matériels IA – Réservations</title>
+  <style>
+    :root{--bg:#f7fafc;--panel:#ffffff;--muted:#4a5568;--text:#1a202c;--accent:#2563eb;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--line:#e2e8f0}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:5;background:#ffffffcc;backdrop-filter:saturate(160%) blur(6px);border-bottom:1px solid var(--line)}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    h1{font-size:22px;margin:2px 0}
+    .sub{color:var(--muted);font-size:13px}
+    .grid{display:grid;gap:16px}
+    .cols-3{grid-template-columns:2fr 1fr 1fr}
+    .cols-2{grid-template-columns:2fr 1fr}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px #00000010}
+    .card{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:12px}
+    .row{display:flex;gap:10px;align-items:center}
+    .row.wrap{flex-wrap:wrap}
+    .sp{display:flex;justify-content:space-between;align-items:center}
+    input,select,button,textarea{background:#fff;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font:inherit}
+    input:focus,select:focus,textarea:focus{outline:2px solid #bfdbfe;border-color:#93c5fd}
+    button{cursor:pointer}
+    .btn{background:#f8fafc}
+    .btn:hover{filter:brightness(0.98)}
+    .btn-primary{background:linear-gradient(135deg,#60a5fa,#3b82f6);border:0;color:#fff}
+    .badge{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#f1f5f9;color:var(--muted)}
+    .badge.ok{border-color:#86efac;background:#dcfce7;color:#14532d}
+    .badge.warn{border-color:#fcd34d;background:#fef9c3;color:#713f12}
+    .badge.err{border-color:#fecaca;background:#fee2e2;color:#7f1d1d}
+    .muted{color:var(--muted)}
+    .title{font-weight:600}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+    .hidden{display:none}
+    .table{width:100%;border-collapse:separate;border-spacing:0}
+    .table th,.table td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    .table th{color:#334155;font-weight:600;background:#f8fafc}
+    .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .pill{display:inline-flex;gap:8px;align-items:center}
+    .tag{font-size:11px;padding:4px 8px;border-radius:999px;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3}
+    .foot{color:#64748b;font-size:12px;margin-top:10px}
+    @media (max-width:980px){.cols-3,.cols-2{grid-template-columns:1fr}.kpi{grid-template-columns:repeat(2,1fr)}}
+    .calendar{display:grid;grid-template-columns:110px repeat(5,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    .calendar .h{background:#f1f5f9;padding:8px;font-weight:600;border-bottom:1px solid var(--line)}
+    .slot{padding:8px;border-left:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .slot.free{background:#ffffff}
+    .slot.busy{background:#fef2f2}
+    .slot .who{font-size:12px;color:#334155}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap sp">
+      <div>
+        <h1>Prêt de matériels IA</h1>
+        <div class="sub">Créneaux demi-journée, lundi à vendredi. Attribution immédiate.</div>
+      </div>
+      <div class="row">
+        <select id="siteFilter"></select>
+        <input id="q" placeholder="Rechercher une ressource" />
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap grid cols-2" style="margin-top:14px">
+    <section class="panel" style="padding:14px">
+      <div class="sp" style="margin-bottom:8px"><div class="title">Calendrier hebdo</div>
+        <div class="row">
+          <button class="btn" id="prevWeek">◀ Semaine -1</button>
+          <button class="btn" id="nextWeek">Semaine +1 ▶</button>
+          <select id="resourceSelect"></select>
+        </div>
+      </div>
+      <div id="calendar" class="calendar"></div>
+      <div class="foot">Créneaux: 09:30–12:30, 13:30–17:30, du lundi au vendredi. Fuseau: Europe/Paris.</div>
+    </section>
+
+    <section class="panel" style="padding:14px">
+      <div class="title" style="margin-bottom:8px">Nouvelle réservation</div>
+      <form id="frmRequest" class="grid" style="gap:8px">
+        <div class="row">
+          <input name="first_name" placeholder="Prénom" required />
+          <input name="last_name" placeholder="Nom" required />
+        </div>
+        <input name="service" placeholder="Service" required />
+        <select name="resource_id" required></select>
+        <div class="row">
+          <input type="date" name="date" required />
+          <select name="window" required>
+            <option value="AM">Matin (09:30–12:30)</option>
+            <option value="PM">Après-midi (13:30–17:30)</option>
+          </select>
+        </div>
+        <button class="btn-primary" type="submit">Réserver maintenant</button>
+      </form>
+      <div class="foot">Règle: premier arrivé, premier servi. Un slot ne peut être réservé qu’une seule fois.</div>
+      <hr/>
+      <div class="title" style="margin:8px 0">Occupants actuels</div>
+      <table class="table" id="tblNow"></table>
+    </section>
+
+    <section class="panel" style="grid-column:1/-1;padding:14px">
+      <div class="sp" style="margin-bottom:8px">
+        <div class="title">Catalogue</div>
+        <div class="row">
+          <select id="typeFilter">
+            <option value="">Tous les types</option>
+          </select>
+          <button class="btn" id="btnExport">Exporter CSV</button>
+          <button class="btn" id="btnAdmin">Admin</button>
+        </div>
+      </div>
+      <table class="table" id="tblItems"></table>
+    </section>
+
+    <section class="panel hidden" id="adminPanel" style="grid-column:1/-1;padding:14px">
+      <div class="sp" style="margin-bottom:8px">
+        <div class="title">Administration</div>
+        <div class="row">
+          <input id="adminKey" placeholder="Clé admin" class="mono" />
+          <button class="btn" id="btnSaveAdmin">Enregistrer</button>
+          <button class="btn" id="btnSync">Sync serveur</button>
+          <a class="btn" href="#doc" id="btnDoc">Doc Apps Script</a>
+        </div>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <div class="title">Paramètres</div>
+          <div class="foot mono">Endpoint: <span id="endpointView">local</span></div>
+          <div class="foot mono">Tableur: unique</div>
+        </div>
+        <div class="card">
+          <div class="title">Import catalogue</div>
+          <input type="file" id="csvFile" accept="text/csv" />
+          <div class="foot">CSV attendu: name,type,site,notes,serial</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="grid-column:1/-1;padding:14px">
+      <div class="title">Feedbacks récents</div>
+      <table class="table" id="tblFb"></table>
+    </section>
+
+    <section class="panel" style="grid-column:1/-1;padding:14px">
+      <div class="title">Procédure de synchronisation Plaud Note Pro</div>
+      <ol>
+        <li>Récupère l’enregistreur et le smartphone passerelle auprès de Dounia ou Ludivine (Secrétariat général).</li>
+        <li>Allume le Plaud Note Pro, active le mode appairage.</li>
+        <li>Sur le smartphone, ouvre l’app Plaud, menu Appareils, choisis « Ajouter », sélectionne l’enregistreur.</li>
+        <li>Teste un enregistrement court, vérifie la synchronisation vers l’app puis l’export vers ton espace de travail.</li>
+        <li>À la restitution, supprime l’appairage côté smartphone si demandé par Dounia ou Ludivine.</li>
+      </ol>
+      <div class="foot">Les deux Plaud Note Pro et les smartphones dédiés à la synchronisation sont disponibles auprès de Dounia et Ludivine.</div>
+    </section>
+  </main>
+
+  <dialog id="dlgFb" style="border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:0;width:min(560px,96vw)">
+    <div class="sp" style="padding:12px 14px;border-bottom:1px solid #e2e8f0">
+      <div class="title">Laisser un commentaire</div>
+      <button class="btn" id="fbClose">Fermer</button>
+    </div>
+    <form id="frmFb" style="padding:12px 14px" class="grid">
+      <div class="muted" id="fbContext"></div>
+      <label>Note
+        <select name="rating" required>
+          <option value="">Choisir</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+        </select>
+      </label>
+      <textarea name="comment" rows="4" placeholder="Retour d’utilisation, incidents, qualité des transcriptions, etc." required></textarea>
+      <input type="hidden" name="reservation_id" />
+      <button class="btn-primary" type="submit">Envoyer</button>
+    </form>
+  </dialog>
+
+  <script>
+  // Config
+  const CONFIG = {
+    endpoint: localStorage.getItem('endpoint') || '',
+    adminKey: localStorage.getItem('adminKey') || ''
+  };
+  const TZ = 'Europe/Paris';
+
+  // Ressources demandées
+  const DEFAULT_ITEMS = [
+    {id:'R-PLAUD-1', name:'Plaud Note Pro #1', type:'Matériel', site:'Secrétariat général', notes:'Micro-cravate', serial:'PLODE-1'},
+    {id:'R-PLAUD-2', name:'Plaud Note Pro #2', type:'Matériel', site:'Secrétariat général', notes:'USB-C', serial:'PLODE-2'},
+    {id:'R-CHATGPT', name:'ChatGPT Pro', type:'Abonnement', site:'Licence', notes:'1 licence', serial:'LIC-GPT'},
+    {id:'R-MISTRAL-1', name:'Mistral Pro #1', type:'Abonnement', site:'Licence', notes:'Licence 1', serial:'LIC-MISTRAL-1'},
+    {id:'R-MISTRAL-2', name:'Mistral Pro #2', type:'Abonnement', site:'Licence', notes:'Licence 2', serial:'LIC-MISTRAL-2'},
+    {id:'R-GEMINI', name:'Google Gemini + NotebookLM', type:'Abonnement', site:'Licence', notes:'1 licence', serial:'LIC-GEMINI'},
+    {id:'R-CLAUDE', name:'Claude Pro', type:'Abonnement', site:'Licence', notes:'1 licence', serial:'LIC-CLAUDE'},
+    {id:'R-GAMMA', name:'Gamma Presentations', type:'Abonnement', site:'Licence', notes:'1 licence', serial:'LIC-GAMMA'}
+  ];
+
+  // Stockage local fallback
+  const store = {
+    getItems(){return JSON.parse(localStorage.getItem('items')||'null')||DEFAULT_ITEMS},
+    setItems(v){localStorage.setItem('items',JSON.stringify(v))},
+    getRes(){return JSON.parse(localStorage.getItem('reservations')||'[]')},
+    setRes(v){localStorage.setItem('reservations',JSON.stringify(v))},
+    getFb(){return JSON.parse(localStorage.getItem('feedback')||'[]')},
+    setFb(v){localStorage.setItem('feedback',JSON.stringify(v))}
+  };
+
+  let ITEMS = store.getItems();
+  let RES = store.getRes();
+  let FB = store.getFb();
+
+  // Utilitaires
+  const el = sel => document.querySelector(sel);
+  const fmt = {
+    ymd(d){const x=new Date(d); return x.toISOString().slice(0,10)},
+    date(d){return new Date(d).toLocaleDateString('fr-FR')},
+    today(){return fmt.ymd(new Date())},
+    weekStart(d){const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x}, // lundi
+    addDays(d,n){const x=new Date(d); x.setDate(x.getDate()+n); return x},
+    slotRange(win){return win==='AM'? ['09:30','12:30'] : ['13:30','17:30']},
+    ts(date,win){const [h1,h2]=fmt.slotRange(win).map(t=>t+':00'); return {start:`${date}T${h1}+01:00`, end:`${date}T${h2}+01:00`}},
+    who(r){return `${r.first_name} ${r.last_name} (${r.service})`}
+  };
+
+  // Filtres init
+  function initFilters(){
+    const typeSel = el('#typeFilter');
+    ['Matériel','Abonnement'].forEach(t=>{const o=document.createElement('option');o.textContent=t;o.value=t;typeSel.appendChild(o)});
+
+    const siteSel = el('#siteFilter');
+    const sites = ['Tous les sites',...new Set(ITEMS.map(x=>x.site))];
+    sites.forEach((s,i)=>{const o=document.createElement('option');o.textContent=s;o.value=i? s:'';siteSel.appendChild(o)});
+
+    const rSel = el('select[name="resource_id"]'); rSel.innerHTML='';
+    ITEMS.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=`${x.name} (${x.type})`;rSel.appendChild(o)});
+    const topSel = el('#resourceSelect'); topSel.innerHTML='';
+    ITEMS.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;topSel.appendChild(o)});
+  }
+
+  // Disponibilité
+  function findReservation(resource_id, date, win){
+    return RES.find(r=>r.resource_id===resource_id && r.date===date && r.window===win && r.status==='ACTIVE');
+  }
+
+  // Rendu calendrier hebdo
+  let weekOffset = 0;
+  function renderCalendar(){
+    const resource_id = el('#resourceSelect').value || ITEMS[0].id;
+    const wrap = el('#calendar'); wrap.innerHTML='';
+    const start = fmt.weekStart(new Date(Date.now()+weekOffset*7*24*3600*1000));
+    const headerRow = document.createElement('div'); headerRow.className='row';
+    // header
+    const header = document.createElement('div'); header.className='h'; header.textContent=''; wrap.appendChild(header);
+    for(let i=0;i<5;i++){
+      const d=fmt.addDays(start,i); const h=document.createElement('div'); h.className='h'; h.textContent=d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'}); wrap.appendChild(h);
+    }
+    // AM/PM rows
+    ['AM','PM'].forEach(win=>{
+      const label=document.createElement('div'); label.className='slot'; label.innerHTML= win==='AM' ? 'Matin<br><span class="muted mono">09:30–12:30</span>' : 'Après‑midi<br><span class="muted mono">13:30–17:30</span>';
+      wrap.appendChild(label);
+      for(let i=0;i<5;i++){
+        const d=fmt.ymd(fmt.addDays(start,i));
+        const r=findReservation(resource_id,d,win);
+        const cell=document.createElement('div');
+        cell.className='slot '+(r? 'busy':'free');
+        cell.dataset.date=d; cell.dataset.window=win; cell.dataset.resource=resource_id;
+        cell.innerHTML = r? `<div class="who">${fmt.who(r)}</div>` : '<span class="muted">Libre</span>';
+        cell.addEventListener('click',onSlotClick);
+        wrap.appendChild(cell);
+      }
+    });
+  }
+
+  function onSlotClick(e){
+    const c=e.currentTarget; const resource_id=c.dataset.resource; const date=c.dataset.date; const win=c.dataset.window;
+    const r=findReservation(resource_id,date,win);
+    const form=el('#frmRequest');
+    form.resource_id.value=resource_id; form.date.value=date; form.window.value=win;
+    if(r){ alert('Créneau déjà réservé par '+fmt.who(r)); } else { window.scrollTo({top:0,behavior:'smooth'}); }
+  }
+
+  // Réservation
+  function submitRequest(e){
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const exists = findReservation(f.resource_id,f.date,f.window);
+    if(exists){ alert('Ce créneau est déjà réservé.'); return; }
+    const id='RES-'+Math.random().toString(36).slice(2,10).toUpperCase();
+    const rec = {id,status:'ACTIVE',created_ts:new Date().toISOString(),...f};
+    RES.push(rec); store.setRes(RES); renderCalendar(); renderNow();
+    if(CONFIG.endpoint){
+      fetch(CONFIG.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'reservation.create',payload:rec,adminKey:CONFIG.adminKey})}).catch(()=>{});
+    }
+    e.target.reset();
+  }
+
+  // Occupants actuels
+  function renderNow(){
+    const nowTbl=el('#tblNow');
+    nowTbl.innerHTML='<tr><th>Ressource</th><th>Créneau</th><th>Occupant</th><th>Action</th></tr>';
+    const today=fmt.today();
+    const win = (new Date().getHours()<13? 'AM':'PM');
+    ITEMS.forEach(it=>{
+      const r=findReservation(it.id,today,win);
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="title">${it.name}</td><td class="muted">${win==='AM'?'Matin':'Après‑midi'}</td>`+
+                   `<td>${r? fmt.who(r):'<span class="muted">Libre</span>'}</td>`+
+                   `<td>${r? `<button class='btn' data-fb='${r.id}'>Commenter</button>`:''}</td>`;
+      nowTbl.appendChild(tr);
+    });
+  }
+
+  // Catalogue
+  function renderItems(){
+    const q = el('#q').value.toLowerCase();
+    const type = el('#typeFilter').value;
+    const site = el('#siteFilter').value;
+    const tbl = el('#tblItems');
+    tbl.innerHTML = '<tr><th>Nom</th><th>Type</th><th>Site</th><th>Licence/Serial</th></tr>';
+    ITEMS.filter(x=>(!type||x.type===type)&&(!site||x.site===site)&&(!q||JSON.stringify(x).toLowerCase().includes(q)))
+      .forEach(x=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td class='title'>${x.name}</td><td>${x.type}</td><td class='muted'>${x.site}</td><td class='mono'>${x.serial||''}</td>`;
+        tbl.appendChild(tr);
+      });
+  }
+
+  // Feedback
+  function openFb(resId){
+    const r = RES.find(x=>x.id===resId); if(!r) return;
+    const it = ITEMS.find(x=>x.id===r.resource_id);
+    el('#fbContext').textContent = `${it.name} – ${r.date} ${r.window==='AM'?'Matin':'Après‑midi'} (par ${fmt.who(r)})`;
+    el('#frmFb input[name="reservation_id"]').value = r.id;
+    dlgFb.showModal();
+  }
+  function submitFb(e){
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const id='FB-'+Math.random().toString(36).slice(2,10).toUpperCase();
+    const it = RES.find(r=>r.id===f.reservation_id);
+    const rec = {id,created_ts:new Date().toISOString(),resource_id:it.resource_id,reservation_id:f.reservation_id,rating:+f.rating,comment:f.comment};
+    FB.unshift(rec); store.setFb(FB); renderFb(); dlgFb.close();
+    if(CONFIG.endpoint){ fetch(CONFIG.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'feedback.create',payload:rec,adminKey:CONFIG.adminKey})}).catch(()=>{}); }
+    e.target.reset();
+  }
+  function renderFb(){
+    const tbl=el('#tblFb'); tbl.innerHTML='<tr><th>Ressource</th><th>Note</th><th>Commentaire</th><th>Date</th></tr>';
+    FB.slice(0,20).forEach(f=>{
+      const it=ITEMS.find(x=>x.id===f.resource_id)||{name:'(supprimé)'};
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class='title'>${it.name}</td><td>${f.rating}</td><td>${f.comment}</td><td class='muted'>${new Date(f.created_ts).toLocaleString('fr-FR')}</td>`;
+      tbl.appendChild(tr);
+    });
+  }
+
+  // Export CSV
+  function exportCSV(){
+    const rows = [['id','resource_id','date','window','first_name','last_name','service','status','created_ts']]
+      .concat(RES.map(r=>[r.id,r.resource_id,r.date,r.window,r.first_name,r.last_name,r.service,r.status,r.created_ts]));
+    const csv = rows.map(r=>r.map(x=>`"${(x||'').toString().replaceAll('"','""')}"`).join(',')).join('
+');
+    const blob = new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='reservations.csv'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  // Admin + Sync
+  function saveAdmin(){ CONFIG.adminKey=el('#adminKey').value.trim(); localStorage.setItem('adminKey',CONFIG.adminKey); alert('Clé admin mise à jour'); }
+  function syncServer(){
+    if(!CONFIG.endpoint){alert('Aucun endpoint configuré. Voir la doc.');return}
+    const payload = {type:'sync',payload:{items:ITEMS,reservations:RES,feedback:FB},adminKey:CONFIG.adminKey};
+    fetch(CONFIG.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(r=>r.json()).then(x=>alert('Sync OK: '+(x&&x.ok))).catch(()=>alert('Erreur de sync'))
+  }
+
+  // Listeners
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    if(b.id==='prevWeek'){weekOffset--; renderCalendar();}
+    if(b.id==='nextWeek'){weekOffset++; renderCalendar();}
+    if(b.id==='btnExport') exportCSV();
+    if(b.id==='btnAdmin') el('#adminPanel').classList.toggle('hidden');
+    if(b.dataset.fb) openFb(b.dataset.fb);
+  });
+  el('#frmRequest').addEventListener('submit',submitRequest);
+  el('#resourceSelect').addEventListener('change',renderCalendar);
+  el('#q').addEventListener('input',()=>{renderItems()});
+  el('#typeFilter').addEventListener('change',renderItems);
+  el('#siteFilter').addEventListener('change',renderItems);
+  el('#btnSaveAdmin').addEventListener('click',saveAdmin);
+  el('#btnSync').addEventListener('click',syncServer);
+  el('#fbClose').addEventListener('click',()=>dlgFb.close());
+  el('#frmFb').addEventListener('submit',submitFb);
+
+  // Boot
+  initFilters(); renderItems(); renderCalendar(); renderNow(); renderFb();
+  </script>
+
+  <!-- ==========================
+       BACKEND GOOGLE APPS SCRIPT
+       ==========================
+  Étapes côté Google:
+  1) Crée une feuille Google nommée Pret_Materiels_IA, avec 4 onglets: resources, slots, reservations, feedback.
+  2) Extensions > Apps Script, colle le code ci-dessous, remplace ADMIN_KEY, puis Déploie > Application Web. Exécuter comme: toi, Accès: Tout utilisateur disposant du lien.
+  3) Dans ton navigateur sur le site GitHub Pages, exécute:
+     localStorage.setItem('endpoint','https://script.google.com/macros/s/…/exec');
+     localStorage.setItem('adminKey','TA_CLE');
+  4) Optionnel: importe le catalogue via CSV (name,type,site,notes,serial).
+
+  CODE Apps Script (server.gs):
+
+  const ADMIN_KEY = 'REMPLACE-MOI';
+  function doPost(e){
+    const body = JSON.parse(e.postData.contents||'{}');
+    const type = body.type||''; const key = body.adminKey||'';
+    const ss = SpreadsheetApp.getActive();
+    const shRes = ss.getSheetByName('reservations');
+    const shFb  = ss.getSheetByName('feedback');
+    const shLog = ss.getSheetByName('log') || ss.insertSheet('log');
+    function ok(data){return ContentService.createTextOutput(JSON.stringify({ok:true,data})).setMimeType(ContentService.MimeType.JSON)}
+    function ko(msg){return ContentService.createTextOutput(JSON.stringify({ok:false,msg})).setMimeType(ContentService.MimeType.JSON)}
+    function log(ev,ref,payload){shLog.appendRow([new Date(),ev,ref,JSON.stringify(payload)])}
+
+    if(type==='reservation.create'){
+      const p=body.payload; // no validation, first-come first-served, trust client to check conflicts
+      shRes.appendRow([new Date(),p.id,p.resource_id,p.date,p.window,p.first_name,p.last_name,p.service,p.status,p.created_ts]);
+      log('reservation.create',p.id,p); return ok(1);
+    }
+    if(type==='feedback.create'){
+      if(key!==ADMIN_KEY) return ko('unauthorized');
+      const p=body.payload; shFb.appendRow([new Date(),p.id,p.resource_id,p.reservation_id,p.rating,p.comment,p.created_ts]);
+      log('feedback.create',p.id,p); return ok(1);
+    }
+    if(type==='sync'){
+      if(key!==ADMIN_KEY) return ko('unauthorized');
+      log('sync',Utilities.getUuid(),{items:(body.payload.items||[]).length,reservations:(body.payload.reservations||[]).length});
+      return ok(1);
+    }
+    return ok('noop');
+  }
+
+  // Feuilles attendues
+  // reservations: A:timestamp B:id C:resource_id D:date E:window F:first_name G:last_name H:service I:status J:created_ts
+  // feedback:     A:timestamp B:id C:resource_id D:reservation_id E:rating F:comment G:created_ts
+  // resources, slots sont optionnelles au départ
+  -->
+</body>
+</html>
